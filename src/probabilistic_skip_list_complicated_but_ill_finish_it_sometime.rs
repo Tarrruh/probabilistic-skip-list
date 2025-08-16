@@ -2,7 +2,9 @@ use std::io::{self, Read};
 use std::{fmt};
 use std::fmt::Formatter;
 use std::ops::Neg;
+use std::rc::Rc;
 
+const MAX_LEVEL: i32 = 20;
 pub trait KeyVal {
     type Key: Ord;
     type Value;
@@ -32,7 +34,7 @@ impl<T> Bound<T> {
     pub fn value(&self) -> &T {
         match self {
             Bound::NegInf => panic!("Accessing negative sentinel"),
-            Bound::Value(T) => T,
+            Bound::Value(t) => t,
             Bound::PosInf => panic!("Accessing positive sentinel")
         }
     }
@@ -54,14 +56,21 @@ impl<K: Ord, V> KeyVal for KeyValuePair<K, V> {
 #[derive(Debug, Clone)]
 pub struct SkipListNode<T: KeyVal + Clone> {
     data: Bound<T>,
-    forwards: Vec<Box<Option<SkipListNode<T>>>>,
+    forwards: Vec<Option<Rc<SkipListNode<T>>>>,
 }
 
 impl<T: KeyVal + Clone> SkipListNode<T> {
     pub fn new(data: T, level: usize) -> Self {
         SkipListNode {
             data: Bound::Value(data),
-            forwards: vec![Box::new(None); level],
+            forwards: vec![None; level],
+        }
+    }
+
+    pub fn new_sentinel(bound: Bound<T>, level: usize) -> Self {
+        SkipListNode {
+            data: bound,
+            forwards: vec![None; level],
         }
     }
 
@@ -73,16 +82,30 @@ impl<T: KeyVal + Clone> SkipListNode<T> {
         self.forwards.len()
     }
 
-    pub fn get_mut_forwards(&mut self) -> &mut Vec<Box<Option<SkipListNode<T>>>> {
+    pub fn get_mut_forwards(&mut self) -> &mut Vec<Option<Rc<SkipListNode<T>>>> {
         &mut self.forwards
     }
 
 }
 
+#[derive(Debug)]
 pub struct ProbabilisticSkipList<T: KeyVal + Clone> {
     length: i32,
-    head: Option<SkipListNode<T>>
+    head: Option<Rc<SkipListNode<T>>>
 }
-pub fn main() {
-    println!("{}", Bound::NegInf < Bound::Value(10))
+
+impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
+    pub fn new() -> Self {
+        let mut head = SkipListNode::new_sentinel(Bound::NegInf, MAX_LEVEL as usize);
+        let tail = Rc::new(SkipListNode::new_sentinel(Bound::PosInf, MAX_LEVEL as usize));
+        let mut ptrs = head.get_mut_forwards();
+        for i in 0..head.forwards.len() {
+            head.forwards[i] = Some(Rc::clone(&tail));
+        }
+        ProbabilisticSkipList {
+            length: 0,
+            head: Some(Rc::new(head))
+        }
+    }
+
 }
