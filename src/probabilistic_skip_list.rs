@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 use std::{fmt};
-use std::cmp::max;
-use std::fmt::Formatter;
+use std::cmp::*;
+use std::fmt::{Error, Formatter};
 use std::ops::Neg;
 use std::rc::Rc;
 use rand::{random, Rng};
@@ -34,9 +34,7 @@ pub(crate) enum Bound<T> {
     Null
 }
 
-
-
-impl<T> Bound<T> {
+impl<T: KeyVal> Bound<T> {
     pub fn value(&self) -> &T {
         match self {
             Bound::NegInf => panic!("Accessing negative sentinel"),
@@ -45,12 +43,34 @@ impl<T> Bound<T> {
             Bound::Null => panic!("Accessing null value")
         }
     }
+
+    pub fn cmp_key(&self, key: &T::Key) ->Ordering
+    where
+        T::Key: Ord,
+    {
+        match self {
+            Bound::NegInf => Ordering::Less,
+            Bound::PosInf => Ordering::Greater,
+            Bound::Value(t) => t.key().cmp(key),
+            Bound::Null => panic!("Comparing with null bound"),
+        }
+    }
+
+    pub fn eq_key(&self, key: &T::Key) -> bool
+    where
+        T::Key: PartialEq,
+    {
+        match self {
+            Bound::Value(t) => *t.key() == *key,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct KeyValuePair<K, V>(pub K, pub V);
 
-impl<K: Ord, V> KeyVal for KeyValuePair<K, V> {
+impl<K: Ord + PartialOrd, V> KeyVal for KeyValuePair<K, V> {
     type Key = K;
     type Value = V;
     fn key(&self) -> &Self::Key {
@@ -60,6 +80,19 @@ impl<K: Ord, V> KeyVal for KeyValuePair<K, V> {
         &self.1
     }
 }
+
+impl<K: PartialOrd, V: PartialOrd> PartialOrd for KeyValuePair<K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<K: PartialEq, V: PartialEq> PartialEq for KeyValuePair<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SkipListNode<T: KeyVal + Clone> {
     data: Bound<T>,
@@ -106,7 +139,7 @@ impl<T: KeyVal + Clone> SkipListNode<T> {
 pub struct ProbabilisticSkipList<T: KeyVal + Clone> {
     length: usize,
     head: NodeID,
-    free_list: Vec<NodeID>,
+    pub free_list: Vec<NodeID>,
     nodes: Vec<SkipListNode<T>>,
     promotion_chance: f32,
 }
@@ -128,47 +161,117 @@ impl<T: KeyVal + Clone + PartialOrd> ProbabilisticSkipList<T> {
         }
     }
 
-    pub fn insert(&mut self, data: T) -> Result<NodeID, &'static str> {
+    pub fn insert(&mut self, data: T) -> Result<NodeID, &'static str>
+    where
+        T::Key: Ord + PartialEq + Clone,
+    {
+        if self.search(data.key().clone()).is_some() {
+            return Err("Duplicate key insertion");
+        }
+
         let index = self.allocate_index();
         let max_level = self.get_max_level();
-        let mut node = SkipListNode::new(data.clone(), max_level as usize);
+        let node = SkipListNode::new(data.clone(), max_level);
         self.nodes[index] = node;
-        //store index in vec of size max_level
-        //then store index of that node in index in list
-        //update 4 level to new node so store it in in index 3.
-        // ok take level from 0 instead to save headachee
-        // do it before you forget
-        //size should be level + 1
-        //add equal check
-        //youll have to update same amount of pointers as the max level + 1
-        let mut updates = vec![0; max_level as usize + 1usize];
-        let mut curr_level = MAX_LEVEL - 1;
-        let mut curr_node = 0;
-        while curr_level >= 0 {
 
-            if let Some(node_index) = self.nodes.get(curr_node).expect("We shouldn't be here :( fix later").forwards[curr_level as usize] {
-                if self.nodes.get(node_index).expect("Invalid index given here").data > Bound::Value(data.clone()) {
+        let mut updates = vec![0; max_level + 1];
+        let mut curr_level = MAX_LEVEL - 1;
+        let mut curr_node = self.head;
+        while curr_level >= 0 {
+            if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
+                let node_bound = &self.nodes[node_index].data;
+
+                if node_bound.cmp_key(data.key()) > Ordering::Equal {
                     if updates.len() > curr_level as usize {
-                        updates[curr_level as usize] = curr_node as i32;
+                        updates[curr_level as usize] = curr_node;
                     }
                     curr_level -= 1;
+                } else {
+                    curr_node = node_index;
+                }
+            } else {
+                updates[curr_level as usize] = curr_node;
+                curr_level -= 1;
+            }
+        }
 
-                }
-                else {
-                    curr_node = self.nodes[curr_node].forwards[curr_level as usize].expect("Invalid id given")
-                }
-            }
-            else {
-                panic!("Shouldn't reach here");
-            }
+        for lvl in 0..=max_level {
+            let temp = self.nodes[updates[lvl]].forwards[lvl];
+            self.nodes[index].forwards[lvl] = temp;
+            self.nodes[updates[lvl]].forwards[lvl] = Some(index);
         }
-        for idx in 0..updates.len() {
-            let temp = self.nodes[updates[idx] as usize].forwards[idx];
-            self.nodes[index].forwards[idx] = temp;
-            self.nodes[updates[idx] as usize].forwards[idx] = Some(index);
-        }
-        println!("{:?}", updates);
+
+        self.length += 1;
         Ok(index)
+    }
+
+
+    pub fn search(&self, key: T::Key) -> Option<T>
+    where
+        T::Key: Ord + PartialEq,
+    {
+        let mut curr_level = MAX_LEVEL - 1;
+        let mut curr_node = self.head;
+        while curr_level >= 0 {
+            if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
+                let node_bound = &self.nodes[node_index].data;
+
+                match node_bound.cmp_key(&key) {
+                    Ordering::Greater => {
+                        curr_level -= 1;
+                    }
+                    Ordering::Equal => {
+                        return Some(node_bound.value().clone());
+                    }
+                    Ordering::Less => {
+                        curr_node = node_index;
+                    }
+                }
+            } else {
+                curr_level -= 1;
+            }
+        }
+        None
+    }
+
+
+    pub fn delete(&mut self, data: T::Key) -> Option<T>
+    where
+        T::Key: Ord + PartialEq,
+    {
+        
+        let mut curr_node = self.head;
+        let mut curr_level = MAX_LEVEL - 1;
+        let mut found = -1i32;
+        
+        while curr_level >= 0 {
+            if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
+                let node_bound = &self.nodes[node_index].data;
+                match node_bound.cmp_key(&data.key()) { 
+                    Ordering::Less => {
+                        curr_node = node_index
+                    }
+                    Ordering::Greater => {
+                        curr_level -= 1;
+                    }
+                    Ordering::Equal => {
+                        found = node_index as i32;
+                        self.nodes[curr_node].forwards[curr_level as usize] = self.nodes[node_index].forwards[curr_level as usize].clone();
+                    }
+                }
+            }
+        }
+        if found >= 0 {
+            self.free_list.push(found as NodeID);
+            self.length -= 1;
+            return Some(self.nodes[found as usize].data.value().clone()) //return clone bc data might change
+        }
+        None
+    }
+    
+
+    pub fn length(&self) -> usize {
+        self.length
     }
 
     fn allocate_index(&mut self) -> NodeID {
@@ -181,13 +284,14 @@ impl<T: KeyVal + Clone + PartialOrd> ProbabilisticSkipList<T> {
             id
         }
     }
-    
-    fn get_max_level(&self) -> i32 {
+
+    fn get_max_level(&self) -> usize {
         let mut level = 0;
         let mut rng = rand::rng();
-        while rng.random() {
+        while level < MAX_LEVEL as usize && rng.random::<f32>() < self.promotion_chance {
             level += 1;
         }
         level
     }
- }
+
+}
