@@ -1,10 +1,5 @@
-use std::io::{self, Read};
-use std::{fmt};
 use std::cmp::*;
-use std::fmt::{Error, Formatter};
-use std::ops::Neg;
-use std::rc::Rc;
-use rand::{random, Rng};
+use rand::Rng;
 
 const MAX_LEVEL: i32 = 20; //maybe change it to 16 idk compare later
 type NodeID = usize;
@@ -140,11 +135,11 @@ pub struct ProbabilisticSkipList<T: KeyVal + Clone> {
     length: usize,
     head: NodeID,
     pub free_list: Vec<NodeID>,
-    nodes: Vec<SkipListNode<T>>,
+    pub nodes: Vec<SkipListNode<T>>,
     promotion_chance: f32,
 }
 
-impl<T: KeyVal + Clone + PartialOrd> ProbabilisticSkipList<T> {
+impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
 
     pub fn new(promotion_chance: f32) -> Self {
         let mut head = SkipListNode::new_sentinel(Bound::<T>::NegInf, MAX_LEVEL as usize);
@@ -247,7 +242,7 @@ impl<T: KeyVal + Clone + PartialOrd> ProbabilisticSkipList<T> {
         while curr_level >= 0 {
             if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
                 let node_bound = &self.nodes[node_index].data;
-                match node_bound.cmp_key(&data.key()) { 
+                match node_bound.cmp_key(&data) { 
                     Ordering::Less => {
                         curr_node = node_index
                     }

@@ -1,5 +1,6 @@
 use std::io::{self, Read};
 use std::{fmt};
+use std::cell::RefCell;
 use std::fmt::Formatter;
 use std::ops::Neg;
 use std::rc::Rc;
@@ -56,7 +57,7 @@ impl<K: Ord, V> KeyVal for KeyValuePair<K, V> {
 #[derive(Debug, Clone)]
 pub struct SkipListNode<T: KeyVal + Clone> {
     data: Bound<T>,
-    forwards: Vec<Option<Rc<SkipListNode<T>>>>,
+    forwards: RefCell<Vec<Option<Rc<SkipListNode<T>>>>>,
 }
 
 impl<T: KeyVal + Clone> SkipListNode<T> {
