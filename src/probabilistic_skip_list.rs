@@ -39,7 +39,7 @@ impl<T: KeyVal> Bound<T> {
         }
     }
 
-    pub fn cmp_key(&self, key: &T::Key) ->Ordering
+    pub fn cmp_key(&self, key: &T::Key) -> Ordering
     where
         T::Key: Ord,
     {
@@ -48,16 +48,6 @@ impl<T: KeyVal> Bound<T> {
             Bound::PosInf => Ordering::Greater,
             Bound::Value(t) => t.key().cmp(key),
             Bound::Null => panic!("Comparing with null bound"),
-        }
-    }
-
-    pub fn eq_key(&self, key: &T::Key) -> bool
-    where
-        T::Key: PartialEq,
-    {
-        match self {
-            Bound::Value(t) => *t.key() == *key,
-            _ => false,
         }
     }
 }
@@ -77,7 +67,7 @@ impl<K: Ord + PartialOrd, V> KeyVal for KeyValuePair<K, V> {
 }
 
 impl<K: PartialOrd, V: PartialOrd> PartialOrd for KeyValuePair<K, V> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
@@ -134,8 +124,8 @@ impl<T: KeyVal + Clone> SkipListNode<T> {
 pub struct ProbabilisticSkipList<T: KeyVal + Clone> {
     length: usize,
     head: NodeID,
-    pub free_list: Vec<NodeID>,
-    pub nodes: Vec<SkipListNode<T>>,
+    free_list: Vec<NodeID>,
+    nodes: Vec<SkipListNode<T>>,
     promotion_chance: f32,
 }
 
@@ -295,4 +285,11 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
         level
     }
 
+    pub fn get_nodes_list(&self) -> &Vec<SkipListNode<T>> {
+        &self.nodes
+    }
+    
+    pub fn get_free_list(&self) -> &Vec<NodeID> {
+        &self.free_list
+    }
 }
