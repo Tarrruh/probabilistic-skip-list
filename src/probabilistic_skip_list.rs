@@ -176,13 +176,19 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
             if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
                 let node_bound = &self.nodes[node_index].data;
 
-                if node_bound.cmp_key(data.key()) > Ordering::Equal {
-                    if updates.len() > curr_level as usize {
-                        updates[curr_level as usize] = curr_node;
+                match node_bound.cmp_key(data.key()) {
+                    Ordering::Greater => {
+                        if updates.len() > curr_level as usize {
+                            updates[curr_level as usize] = curr_node;
+                        }
+                        curr_level -= 1;
                     }
-                    curr_level -= 1;
-                } else {
-                    curr_node = node_index;
+                    Ordering::Less => {
+                        curr_node = node_index;
+                    }
+                    Ordering::Equal => {
+                        panic!("Should not reach here")
+                    }
                 }
             } else {
                 updates[curr_level as usize] = curr_node;

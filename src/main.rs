@@ -28,8 +28,8 @@ fn main() {
     let csv_reader = csv::Reader::from_path("./src/customers-2mil.csv");
     if let Ok(mut records) = csv_reader {
         for result in records.deserialize() {
-            let res: Customer = result.expect("Csv read error");
-            skip_list.insert(KeyValuePair(res.customer_id.clone(), res)).expect("PANICCCC!!!!!!!!!! OH NOOOOOO!!!!");
+            let customer: Customer = result.expect("Csv read error");
+            skip_list.insert(KeyValuePair(customer.customer_id.clone(), customer)).expect("PANICCCC!!!!!!!!!! OH NOOOOOO!!!!");
         }
     }
     println!("Finished loading, now searching");
