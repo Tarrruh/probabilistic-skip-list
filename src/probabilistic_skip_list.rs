@@ -22,7 +22,7 @@ impl<T: Ord> KeyVal for T {
 }
 
 #[derive(PartialOrd, PartialEq, Debug, Clone)]
-pub(crate) enum Bound<T> {
+pub enum Bound<T> {
     NegInf,
     Value(T),
     PosInf,
@@ -55,7 +55,7 @@ impl<T: KeyVal> Bound<T> {
 #[derive(Debug, Clone)]
 pub struct KeyValuePair<K, V>(pub K, pub V);
 
-impl<K: Ord + PartialOrd, V> KeyVal for KeyValuePair<K, V> {
+impl<K: Ord, V> KeyVal for KeyValuePair<K, V> {
     type Key = K;
     type Value = V;
     fn key(&self) -> &Self::Key {
@@ -65,19 +65,6 @@ impl<K: Ord + PartialOrd, V> KeyVal for KeyValuePair<K, V> {
         &self.1
     }
 }
-
-impl<K: PartialOrd, V: PartialOrd> PartialOrd for KeyValuePair<K, V> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
-impl<K: PartialEq, V: PartialEq> PartialEq for KeyValuePair<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct SkipListNode<T: KeyVal + Clone> {
     data: Bound<T>,
@@ -146,9 +133,9 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
         }
     }
 
-    pub fn insert(&mut self, data: T) -> Result<NodeID, &'static str>
+    pub fn insert(&mut self, data: T) -> Result<NodeID, &str>
     where
-        T::Key: Ord + PartialEq + Clone,
+        T::Key: Ord + Clone,
     {
         if self.search(data.key().clone()).is_some() {
             return Err("Duplicate key insertion");
@@ -199,7 +186,7 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
 
     pub fn search(&self, key: T::Key) -> Option<T>
     where
-        T::Key: Ord + PartialEq,
+        T::Key: Ord,
     {
         let mut curr_level = MAX_LEVEL - 1;
         let mut curr_node = self.head;
@@ -228,17 +215,17 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
 
     pub fn delete(&mut self, data: T::Key) -> Option<T>
     where
-        T::Key: Ord + PartialEq,
+        T::Key: Ord,
     {
-        
+
         let mut curr_node = self.head;
         let mut curr_level = MAX_LEVEL - 1;
         let mut found = -1i32;
-        
+
         while curr_level >= 0 {
             if let Some(node_index) = self.nodes[curr_node].forwards[curr_level as usize] {
                 let node_bound = &self.nodes[node_index].data;
-                match node_bound.cmp_key(&data) { 
+                match node_bound.cmp_key(&data) {
                     Ordering::Less => {
                         curr_node = node_index
                     }
@@ -259,7 +246,7 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
         }
         None
     }
-    
+
 
     pub fn length(&self) -> usize {
         self.length
@@ -288,7 +275,7 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
     pub fn get_nodes_list(&self) -> &Vec<SkipListNode<T>> {
         &self.nodes
     }
-    
+
     pub fn get_free_list(&self) -> &Vec<NodeID> {
         &self.free_list
     }

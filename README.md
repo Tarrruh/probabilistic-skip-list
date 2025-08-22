@@ -1,2 +1,15 @@
 # Probabilistic-Skip-List
-Probabilistic Skip List using rust.
+A skip list implementation written in rust
+
+
+# Searching
+![img.png](img.png)
+Search for the node 19
+
+# Insertion
+![img_1.png](img_1.png)
+Insert node 17 
+
+# Deletion
+![img_2.png](img_2.png)
+Delete node 17

@@ -47,8 +47,7 @@ fn main() {
 
     skip_list.delete("7ac9D288dBb129f".to_string());
     println!("{:#?}",skip_list.search("7ac9D288dBb129f".to_string()));
-    println!("{:?}",skip_list.get_free_list());
-
+    
     // println!("{:?}",skip_list.get_nodes_list().get(0));
 
 }
