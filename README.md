@@ -1,6 +1,7 @@
 # Probabilistic-Skip-List
 A skip list implementation written in rust
 
+All operations (insert, delete, search) will be 
 
 # Searching
 ![img.png](img.png)

@@ -155,6 +155,7 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
 
                 match node_bound.cmp_key(data.key()) {
                     Ordering::Greater => {
+                        
                         if updates.len() > curr_level as usize {
                             updates[curr_level as usize] = curr_node;
                         }
@@ -167,9 +168,6 @@ impl<T: KeyVal + Clone> ProbabilisticSkipList<T> {
                         panic!("Should not reach here")
                     }
                 }
-            } else {
-                updates[curr_level as usize] = curr_node;
-                curr_level -= 1;
             }
         }
 
